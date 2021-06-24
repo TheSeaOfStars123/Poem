@@ -56,16 +56,19 @@ def train(**kwargs, ):
     # step5: 训练前准备工作
     previous_loss = 1e20
     # 绘制曲线需要
-    # period = []
+    period = []
+    count = 0
     training_loss = []
     train_accs = []
-    validation_accs = []
+    # validation_accs = []
     """
     保存训练日志
     路径:/tmp/training_log_0523_23:57:29.txt
     """
     prefix = opt.training_log + "_"
     path = time.strftime(prefix + '%m%d_%H:%M:%S.txt')
+    if not os.path.exists(path):
+        os.mkdir(path)
     if not os.path.isfile(path):
         open(path, 'w')
 
@@ -102,23 +105,26 @@ def train(**kwargs, ):
             # 更新统计指标以及可视化
             top1.add(prec1.item())  # 准确率
             loss_meter.add(loss.item())   # 总loss
-            # period.append(epoch*len(train_dataloader)+ii)  # 一次epoch有4079次
-            # training_loss.append(loss_meter.value()[0])  # 记录每一个batch_size训练过程中的train_loss
+            period.append(epoch*len(train_dataloader)+ii)  # 一次epoch有4079次
+            period.append(count)  # 一次epoch有4079次
+            training_loss.append(loss_meter.value()[0])  # 记录每一个batch_size训练过程中的train_loss
+            train_accs.append(top1.value()[0])
 
             postfix = {'train_loss': '%.6f' % (loss_meter.value()[0]), 'train_acc': '%.6f' % (top1.value()[0])}
             train_dataloader.set_postfix_str(postfix)
             # 使用tensorboard进行曲线绘制
             if not os.path.exists(opt.tensorboard_path):
                 os.mkdir(opt.tensorboard_path)
-                writer = SummaryWriter(opt.tensorboard_path)
-                writer.add_scalar('Train/Loss', loss_meter.value()[0], epoch)
-                writer.add_scalar('Train/Accuracy', top1.value()[0], epoch)
-                writer.flush()
+            count = count + 1
+            writer = SummaryWriter(opt.tensorboard_path)
+            writer.add_scalar('Train/Loss', loss_meter.value()[0], count)
+            writer.add_scalar('Train/Accuracy', top1.value()[0], count)
+            writer.flush()
 
             if ii % opt.print_freq == opt.print_freq - 1:
                 print('[%d,%5d] train_loss :%.3f' %
                       (epoch + 1, ii + 1, loss_meter.value()[0]))
-                f.write('\n[%d,%5d] train_acc :%.3f' %
+                f.write('\n[%d,%5d] train_loss :%.3f' %
                         (epoch + 1, ii + 1, loss_meter.value()[0]))
                 # 对目前模型情况进行测试
                 # https://tw511.com/a/01/27245.html
@@ -128,12 +134,12 @@ def train(**kwargs, ):
                 # 视觉化一次
                 print(str(ii) + ":" + generate(model, '床前明月光', ix2word, word2ix))
 
-        model.save()
+
 
         # 当一个epoch结束之后开始打印信息
-        print('epoch %d, lr %.4f, train_oss %.4f, train_acc %.3f %%, time %.1f sec' %
+        print('epoch %d, lr %.4f, train_loss %.4f, train_acc %.3f %%, time %.1f sec' %
               (epoch + 1, lr, loss_meter.value()[0], top1.value()[0], time.time() - start))
-        f.write('\nepoch %d, lr %.4f, loss %.4f, train acc %.3f %%, val acc %.3f %%, time %.1f sec' %
+        f.write('\nepoch %d, lr %.4f, train_loss %.4f, train_acc %.3f %%, time %.1f sec' %
                 (epoch + 1, lr, loss_meter.value()[0], top1.value()[0], time.time() - start))
         f.close()
 
@@ -143,6 +149,16 @@ def train(**kwargs, ):
             for param_group in optimizer.param_groups:
                 param_group['lr'] = lr
         previous_loss = loss_meter.value()[0]
+
+    model.save()
+    plt.plot(period, training_loss)
+    plt.plot(period, train_accs)
+    # 使用plt保存loss图像
+    loss_prefix = opt.loss_file + "_"
+    loss_path = time.strftime(loss_prefix + "%m%d_%H:%M:%S.png")
+    print('loss_path:', loss_path)
+    plt.savefig(loss_path)
+    plt.show()
 
 
 # 给定几个词，根据这个词生成完成的诗歌
@@ -158,7 +174,7 @@ def generate(model, start_words, ix2word, word2ix):
     # hidden = t.zeros((2, opt.LSTM_layers, 1, opt.num_hiddens), dtype=t.float)
     if opt.use_gpu:
         input = input.cuda()
-        hidden = hidden.cuda()
+        # hidden = hidden.cuda()
         model = model.cuda()
     model.eval()
     with t.no_grad():
@@ -174,9 +190,11 @@ def generate(model, start_words, ix2word, word2ix):
                 w = ix2word[top_index.item()]
                 result.append(w)
                 input = Variable(input.data.new([top_index])).view(1, 1)
-            if w == '<EOF>':  # 输出了结束标志就退出
+            if w == '<EOP>':  # 输出了结束标志就退出
                 break
-    return result
+    # 把模型恢复为训练模式
+    model.train()
+    return ''.join(result)
 
 
 def test(**kwargs):

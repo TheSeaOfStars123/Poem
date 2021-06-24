@@ -6,8 +6,10 @@
 
 import time
 import torch as t
+import os
 
 class BasicModule(t.nn.Module):
+    print('BasicModule:', os.getcwd())
     def __init__(self):
         super(BasicModule, self).__init__()
         self.module_name = str(type(self))
@@ -28,7 +30,7 @@ class BasicModule(t.nn.Module):
         :return:
         """
         if name is None:
-            prefix = 'checkpoints/' + self.module_name + "_"
+            prefix = os.getcwd() + '/checkpoints/' + self.module_name + "_"
             name = time.strftime(prefix + '%m%d_%H:%M:%S.pth')
         t.save(self.state_dict(), name)
         return name

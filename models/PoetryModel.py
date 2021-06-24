@@ -22,6 +22,9 @@ class PoetryModel(BasicModule):
         self.lstm = nn.LSTM(embedding_num, self.num_hiddens, self.num_layers, batch_first=True, dropout=0,  # input為(batch, seq, input_size)
                             bidirectional=False)
         # 进行分类
+        # self.fc1 = nn.Linear(self.hidden_dim, 2048)
+        # self.fc2 = nn.Linear(2048, 4096)
+        # self.fc3 = nn.Linear(4096, vocab_size)
         self.dense = nn.Linear(self.num_hiddens, vocab_size)
 
     def forward(self, inputs, state=None):
@@ -44,5 +47,9 @@ class PoetryModel(BasicModule):
 
         # 全连接层会首先将Y的形状变成(seq_len*batch_size, num_hiddens)
         # 它的输出形状为(seq_len*batch_size, vocab_size)
+        # output = torch.tanh(self.fc1(Y))
+        # output = torch.tanh(self.fc2(output))
+        # output = self.fc3(output)
+        # output = output.reshape(batch_size * seq_len, -1)
         output = self.dense(Y.contiguous().view(batch_size*seq_len, -1))
         return output, self.state

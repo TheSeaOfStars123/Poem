@@ -60,3 +60,5 @@ def accuracy(output, label, topk=(1,)):
         correct_k = correct[:k].contiguous().view(-1).float().sum(0)  # 前k行的数据 然后平整到1维度，来计算true的总个数
         rtn.append(correct_k.mul_(100.0 / batch_size))  # mul_() ternsor 的乘法  正确的数目/总的数目 乘以100 变成百分比
     return rtn
+
+
